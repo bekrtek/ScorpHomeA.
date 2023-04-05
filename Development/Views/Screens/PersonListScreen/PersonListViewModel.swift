@@ -19,30 +19,31 @@ internal protocol PersonListViewModelInterface {
 
 final class PersonListViewModel {
     
+    // MARK: - Properties
     weak var view: PersonListViewInterface?
-    
     private var next: String?
     private var people = [Person]()
+    private let minStartingCount = 20
     
+    // MARK: - Methods
     private func getPeopleList(initialRequest: Bool) {
         view?.beginRefleshing()
         if initialRequest { self.next = nil ; self.people = [Person]() }
-        
         DataSource.fetch(next: self.next) { [weak self] (fetchResponse, fetchError) in
             guard let self else { return }
-            DebugManager.shared.debugStartOfRequest(initialRequest: initialRequest, fetchResponse: fetchResponse, people: self.people)
+            DebugManager.shared.debugStartOfRequest(initialRequest: initialRequest, next: self.next, fetchResponse: fetchResponse, people: self.people)
             if let fetchResponse = fetchResponse {
+                self.next = fetchResponse.next
                 if initialRequest && fetchResponse.people.count == 0 {
                     self.view?.noDataView(shouldShow: true)
                     self.view?.endRefleshing()
                 } else {
                     self.view?.noDataView(shouldShow: false)
                     self.processPeopleList(fetchResponse: fetchResponse)
-                    self.next = fetchResponse.next
                 }
             } else if let fetchError = fetchError {
-                DebugManager.shared.log("Request Error: \(fetchError.errorDescription)", signatureImage: "🛑", repeatCount: 2)
-                self.getPeopleList(initialRequest: false)
+                DebugManager.shared.log("Retrying Request for Min Start Count -> \(fetchError.errorDescription)", signatureImage: "🛑", repeatCount: 2)
+                self.getPeopleList(initialRequest: initialRequest)
                 return
             }
         }
@@ -50,10 +51,17 @@ final class PersonListViewModel {
     
      private func processPeopleList(fetchResponse: FetchResponse) {
         let newPeople = fetchResponse.people
+         var nonUniquePeopleCount = Int()
         for newMember in newPeople {
             let isIdUnique = !people.contains(where: { $0.id == newMember.id } )
-            if isIdUnique { people.append(newMember) }
-            if !isIdUnique { DebugManager.shared.log("Sama ID detected for \(newMember.fullName)",signatureImage: "❗️", repeatCount: 2) }
+            if  isIdUnique { people.append(newMember) }
+            if !isIdUnique { nonUniquePeopleCount += 1 }
+        }
+        if nonUniquePeopleCount != 0 { DebugManager.shared.log("Same ID detected for \(nonUniquePeopleCount) people",signatureImage: "❗️", repeatCount: 2) }
+        if people.count < minStartingCount {
+            DebugManager.shared.log("Retrying Request for Min Start Count", signatureImage: "🏈", repeatCount: 4)
+            self.getPeopleList(initialRequest: false)
+            return
         }
         DebugManager.shared.debugEndOfAdding(people: self.people)
         self.view?.reloadData()
@@ -61,6 +69,7 @@ final class PersonListViewModel {
     }
 }
 
+// MARK: - PersonListViewModelInterface
 extension PersonListViewModel: PersonListViewModelInterface {
     
     func viewDidLoad(initialRequest: Bool) {
@@ -84,6 +93,7 @@ extension PersonListViewModel: PersonListViewModelInterface {
     }
     
     func scrolledToEnd(initialRequest: Bool) {
+        guard people.count > minStartingCount else { return }
         DebugManager.shared.log("Scrolled to End", signatureImage: "🏈")
         getPeopleList(initialRequest: initialRequest)
     }

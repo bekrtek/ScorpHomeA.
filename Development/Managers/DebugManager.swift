@@ -12,21 +12,23 @@ final class DebugManager {
     static let shared = DebugManager()
     private init() {}
     
-    func debugStartOfRequest(initialRequest: Bool, fetchResponse: FetchResponse?, people: [Person]) {
+    func debugStartOfRequest(initialRequest: Bool, next: String?, fetchResponse: FetchResponse?, people: [Person]) {
+        let fetchResponsePeopleCount: String = String(fetchResponse?.people.count ?? 0)
+        let nextString = String(next ?? "nil")
+        let requestStatus = (fetchResponse == nil) ? "Failed" : "Successful"
         print("""
-              -----------Sending Request-------------
+              ----------- Sending Request -> \(requestStatus) -------------
               İnitialReuest: \(initialRequest)
+              Next String: \(nextString)
               Current People Count: \(people.count)
-              Respons Count: \(String(describing: fetchResponse?.people.count))
+              Response Count: \(fetchResponsePeopleCount)
               """)
     }
     
     func debugEndOfAdding(people: [Person]) {
         print("""
-              -----------
-              Result of Adding
-              Current People Count: \(people.count)
-              ------------------------
+              People Count After Added Unique People: \(people.count)
+              ----------- Result of Adding -------------
               """)
     }
     
